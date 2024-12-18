@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
+<title>Implementing Hybrid Authentication</title>
+<link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.28/"></script>
+<style>
+  html, body, #viewDiv {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  .button-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .btn {
+    background-color: #0079c1;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 0 10px;
+    transition: background-color 0.3s;
+  }
+  .btn:hover {
+    background-color: #005a8c;
+  }
+  .btn:active {
+    background-color: #003d62;
+  }
+  .heading {
+    text-align: center;
+    font-size: 2em;
+    margin-top: 50px;
+    color: #0079c1;
+    font-family: 'Arial', sans-serif;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+<div class="button-container">
+<button id="sign-in" class="btn">Sign In</button>
+<button id="sign-out" class="btn">Sign Out</button>
+</div>
+<h2 id="heading" class="heading">Using User Authentication or API Keys with the ArcGIS Maps SDK for JS!</h2>
+<pre><code id="results"></code></pre>
+<div id="viewDiv"></div> <!-- Container for the map -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+   require([
+      "esri/config",
+      "esri/portal/Portal",
+      "esri/identity/OAuthInfo",
+      "esri/identity/IdentityManager",
+      "esri/Map",
+      "esri/views/MapView"
+   ], function (esriConfig, Portal, OAuthInfo, esriId, Map, MapView) {
+      const apiKey = "YOUR API KEY"; 
+      const info = new OAuthInfo({
+          appId: "YOUR APP ID", //client id after registering app with ArcGIS, for user authentication
+          popup: false
+      });
+
+      esriId.registerOAuthInfos([info]);
+      function initializeMap(useApiKey) {
+          const basemap = "streets-vector"; // basemap 
+          const map = new Map({
+              basemap: basemap
+          });
+
+          const view = new MapView({
+              container: "viewDiv",
+              map: map,
+              zoom: 4, 
+              center: [-77.036, 38.907], 
+          });
+
+          if (useApiKey) { //use api key is not signed in
+              esriConfig.apiKey = apiKey;
+          } else {
+              esriConfig.apiKey = null;
+          }
+          document.getElementById("heading").style.display = useApiKey ? "block" : "none";
+      }
+
+      esriId.checkSignInStatus(info.portalUrl + "/sharing") //check is user has signed into ArcGIS
+          .then(() => {
+              const portal = new Portal();
+              portal.load().then(() => {
+                  if (portal.user) {
+                      const results = {
+                          name: portal.user.fullName,
+                          username: portal.user.username
+                      };
+                      document.getElementById("results").innerText = JSON.stringify(results, null, 2);
+                      initializeMap(false);
+                  } else {
+                      console.error("User details are not available. Ensure the user is signed in.");
+                      initializeMap(true);
+                  }
+              }).catch(error => {
+                  console.error("Error loading the portal: ", error);
+                  initializeMap(true);
+              });
+          })
+
+          .catch(() => {
+              initializeMap(true);
+          });
+
+      document.getElementById("sign-in").addEventListener("click", function () {
+          esriId.getCredential(info.portalUrl + "/sharing").then(() => {
+              window.location.reload(); // Reload to check authentication
+          });
+
+      });
+      document.getElementById("sign-out").addEventListener("click", function () {
+          esriId.destroyCredentials();
+          window.location.reload(); //reload if signed out
+      });
+   });
+});
+</script>
+</body>
+</html>
